@@ -1,9 +1,11 @@
-import styles from "./Homepage.module.css";
 import { useEffect, useState } from "react";
 import { HexAlphaColorPicker } from "react-colorful";
-
 import { debounce } from "lodash";
+
+import styles from "./Homepage.module.css";
 import Spinner from "../components/Spinner";
+import AlarmDay from "../components/AlarmDay";
+import AlarmDayEditor from "../components/AlarmDayEditor";
 
 const urlBase = "http://192.168.1.55:80";
 
@@ -11,7 +13,12 @@ function Homepage() {
   const [isOn, setIsOn] = useState(false);
   const [color, setColor] = useState("#FFF");
   const [brightness, setBrightness] = useState(0);
+  const [alarms, setAlarms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [openDay, setOpenDay] = useState(null);
+
+  const buttonType = isOn ? "onButton" : "offButton";
+  const computedColor = `${color}${brightness.toString(16).padStart(2, "0")}`;
 
   useEffect(() => {
     const fetchLightStatus = () =>
@@ -29,10 +36,21 @@ function Homepage() {
         .then((res) => res.text())
         .then((data) => setBrightness(Number(data)));
 
+    const fetchAlarms = () =>
+      fetch(`${urlBase}/show-alarms`)
+        .then((res) => res.json())
+        .then((data) => {
+          let processedData = data.map((alarm) =>
+            String(Number(alarm).toFixed(2)).padStart(5, "0").replace(".", ":")
+          );
+          setAlarms(processedData);
+        });
+
     Promise.all([
       fetchLightStatus(),
       fetchLightColor(),
       fetchLightBrightness(),
+      fetchAlarms(),
     ]).then(() => setIsLoading(false));
   }, []);
 
@@ -57,19 +75,69 @@ function Homepage() {
     setIsOn(true);
   }, 500);
 
-  const buttonType = isOn ? "onButton" : "offButton";
-  const computedColor = `${color}${brightness.toString(16).padStart(2, "0")}`;
+  function handleDayClick(i) {
+    if (openDay === i) {
+      setOpenDay(null);
+    } else {
+      setOpenDay(i);
+    }
+  }
+
+  function handleSaveAlarmTime(index, newTime) {
+    const newAlarms = [...alarms];
+    newAlarms[index] = newTime;
+
+    console.log(newAlarms);
+
+    const updateBody = {
+      day: index,
+      time: Number(newTime.replace(":", ".")),
+    };
+
+    console.log(updateBody);
+
+    fetch(`${urlBase}/change-alarm`, {
+      method: "POST",
+      body: JSON.stringify(updateBody),
+    });
+
+    setOpenDay(null);
+    setAlarms(newAlarms);
+  }
 
   return (
     <div className={styles.homepage}>
-      <h1>Alarm homepage</h1>
-
       {isLoading ?? <Spinner />}
 
-      <HexAlphaColorPicker color={computedColor} onChange={handleColorChange} />
-      <button className={styles[buttonType]} onClick={handleToggle}>
-        Toggle
-      </button>
+      {openDay !== null ? (
+        <AlarmDayEditor
+          dayOfWeek={openDay}
+          time={alarms[openDay]}
+          onSave={handleSaveAlarmTime}
+        />
+      ) : (
+        <>
+          <h2>Alarm homepage</h2>
+          <div className={styles.alarms}>
+            {alarms.map((alarm, i) => (
+              <AlarmDay
+                key={i}
+                alarm={alarm}
+                i={i}
+                onClick={() => handleDayClick(i)}
+              />
+            ))}
+          </div>
+
+          <HexAlphaColorPicker
+            color={computedColor}
+            onChange={handleColorChange}
+          />
+          <button className={styles[buttonType]} onClick={handleToggle}>
+            Toggle
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -16,6 +16,19 @@
     color: black;
 }
 
+.alarms{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: auto;
+    border: 1px solid black;
+    border-radius: 10px;
+    background-color: cadetblue;
+    overflow: hidden;
+}
+
+
 :global(.react-colorful){
     margin: 20px;
 }
+
